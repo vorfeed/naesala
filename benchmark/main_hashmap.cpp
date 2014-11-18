@@ -13,12 +13,13 @@
 #include <ctime>
 #include <map>
 #include <ext/hash_map>
-#include <unordered_map>        // c++/4.8.2/bits/unordered_map.h
-#include <tr1/unordered_map>    // c++/4.8.2/tr1/unordered_map.h
+#include <unordered_map>        // c++/4.9.1/bits/unordered_map.h
+#include <tr1/unordered_map>    // c++/4.9.1/tr1/unordered_map.h
 #include <boost/unordered_map.hpp>
 
 #include <naesala/third/alignhash.h>
 #include <naesala/common/range.h>
+#include <naesala/hashmap/linear_hashmap.h>
 
 using namespace naesala;
 
@@ -59,7 +60,7 @@ private:
     void test_insert() {
         Duration duration("insert");
         for (int i : range(OP_TIMES)) {
-            _map[KEY_POS + rand() % KEY_SPAN] = i;
+            _map[KEY_POS + rand() & KEY_SPAN_MASK] = i;
         }
     }
     void test_traverse() {
@@ -72,20 +73,20 @@ private:
     void test_find() {
         Duration duration("find");
         for (int i : range(OP_TIMES)) {
-            int j = _map[KEY_POS + rand() % KEY_SPAN];
+            int j = _map[KEY_POS + rand() & KEY_SPAN_MASK];
             (void) j; // suppress unused warning
         }
     }
     void test_delete() {
         Duration duration("delete");
-        for (int i : range(KEY_SPAN)) {
-            _map.erase(KEY_POS + rand() % KEY_SPAN);
+        for (int i : range(OP_TIMES)) {
+            _map.erase(KEY_POS + rand() & KEY_SPAN_MASK);
         }
     }
 
-    static int const OP_TIMES = 1000000;
+    static int const OP_TIMES = 1 << 24;
     static int const KEY_POS = 0xcdcdcdcd;
-    static int const KEY_SPAN = OP_TIMES * 2;
+    static int const KEY_SPAN_MASK = OP_TIMES * 2 - 1;
     Map _map;
 };
 
@@ -96,32 +97,37 @@ int main(int argc, char* argv[]) {
     suite<std::tr1::unordered_map<int, int>>().test("std::tr1::unordered_map");
     suite<boost::unordered_map<int, int>>().test("boost::unordered_map");
     suite<align_hash_map<int, int>>().test("align_hash_map");
+    suite<LinearHashmap<int, int>>().test("LinearHashmap");
 
     return 0;
 }
 
 /*
 
-[root@localhost build]# ./hashmap
+gcc 4.9.1, boost 1.56, -O2
+key不重复率：0.76
+16,777,216次操作
 --------------------------------
 [std::map]
-insert: 1.33993s        | traverse: 0.089017s   | find: 1.24957s        | delete: 2.63042s      |
+insert: 15.3459s        | traverse: 1.02469s    | find: 17.642s         | delete: 2.027s        | 
 --------------------------------
 [__gnu_cxx::hash_map]
-insert: 0.42164s        | traverse: 0.113012s   | find: 0.238216s       | delete: 0.404426s     |
+insert: 4.07776s        | traverse: 1.062s      | find: 4.17001s        | delete: 0.33801s      | 
 --------------------------------
 [std::unordered_map]
-insert: 0.527232s       | traverse: 0.042736s   | find: 0.530173s       | delete: 0.60149s      |
+insert: 5.132s          | traverse: 0.384036s   | find: 2.53397s        | delete: 0.569996s     | 
 --------------------------------
 [std::tr1::unordered_map]
-insert: 0.35997s        | traverse: 0.075255s   | find: 0.390161s       | delete: 0.371356s     |
+insert: 3.94881s        | traverse: 0.303182s   | find: 1.924s          | delete: 0.334859s     | 
 --------------------------------
 [boost::unordered_map]
-insert: 0.651387s       | traverse: 0.036531s   | find: 0.692967s       | delete: 0.785001s     |
+insert: 4.997s          | traverse: 0.442003s   | find: 3.85299s        | delete: 0.574989s     | 
 --------------------------------
 [align_hash_map]
-insert: 0.159173s       | traverse: 0.041413s   | find: 0.169958s       | delete: 0.150414s     |
+insert: 2.00799s        | traverse: 0.0600757s  | find: 1.04993s        | delete: 0.0911587s    | 
+--------------------------------
+[LinearHashmap]
+insert: 0.914718s       | traverse: 0.0471907s  | find: 0.746924s       | delete: 0.0620157s    | 
 
 */
-
 

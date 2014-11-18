@@ -23,6 +23,10 @@ Configure
 
 * ConfParser：解析ini格式的配置文件
 
+Hashmap
+
+* LinearHashmap：高性能线性hash表
+
 Lockfree
 
 * LockfreeStack：无锁栈，实现自 Treiber 算法
@@ -37,16 +41,19 @@ BlockingQueue
 
 Hashmap
 
-* C++/Gnu/Boost/第三方开源 hashmap性能比较
+* C++/Gnu/Boost/第三方开源/LinearHashmap hashmap性能比较
+
+* 16,777,216 operations
 
 > | Hashmap | Insert | Traverse | Find | Delete |
 > | :-------- | :--------| :--------| :--------| :--------|
-> | [std::map]  | 1.33993s | 0.089017s | 1.24957s | 2.63042s |
-> | [__gnu_cxx::hash_map] | 0.42164s | 0.113012s | 0.238216s | 0.404426s |
-> | [std::unordered_map] | 0.527232s | 0.042736s | 0.530173s | 0.60149s |
-> | [std::tr1::unordered_map] | 0.35997s | 0.075255s | 0.390161s | 0.371356s |
-> | [boost::unordered_map] | 0.651387s | 0.036531s | 0.692967s | 0.785001s |
-> | [align_hash_map] | 0.159173s | 0.041413s | 0.169958s | 0.150414s |
+> | [std::map] | 15.3459s | 1.02469s | 17.642s | 2.027s |
+> | [__gnu_cxx::hash_map] | 4.07776s | 1.062s | 4.17001s | 0.33801s |
+> | [std::unordered_map] | 5.132s | 0.384036s | 2.53397s | 0.569996s |
+> | [std::tr1::unordered_map] | 3.94881s | 0.303182s | 1.924s | 0.334859s |
+> | [boost::unordered_map] | 4.997s | 0.442003s | 3.85299s | delete: 0.574989s |
+> | [align_hash_map] | 2.00799s | 0.0600757s | 1.04993s | 0.0911587s |
+> | [LinearHashmap] | 0.914718s | 0.0471907s | 0.746924s | 0.0620157s |
 
 Lockfree
 
