@@ -9,6 +9,8 @@
 #include <string.h>
 #include <atomic>
 #include <boost/noncopyable.hpp>
+
+#include <naesala/common/likely.h>
 #include "lockfree_util.h"
 
 namespace naesala {
@@ -27,7 +29,7 @@ struct IListNode {
 template <class T>
 class LockfreeList : boost::noncopyable {
 public:
-    LockfreeList() : _dummy(combine(new T(), mask())), _head(_dummy), _tail(_dummy) {}
+    LockfreeList() : _dummy(combine(new T())), _head(_dummy), _tail(_dummy) {}
     ~LockfreeList() {
         T* t = nullptr;
         while ((t = take())) {
@@ -40,7 +42,6 @@ public:
     void put(T* node) {
         while (true) {
 //            node->next.store(0, std::memory_order_relaxed);
-            uint64_t node_combine = combine(node, mask());
             // (gdb) p tail
             // $1 = (LFLWrapper::Node *) 0x202c30373832202c
             // How can tail be set with an invalid pointer ?
@@ -51,11 +52,11 @@ public:
             // Tail was not pointing to the last node.
             if (tail_next) {
                 // Try to swing Tail to the next node.
-                _tail.compare_exchange_strong(tail_combine, combine(tail_next, mask()));
+                _tail.compare_exchange_strong(tail_combine, combine(tail_next));
             //  Try to link node at the end of the linked list.
-            } else if (tail->next.compare_exchange_weak(tail_next_combine, node_combine)) {
+            } else if (tail->next.compare_exchange_weak(tail_next_combine, combine(node))) {
                 // Try to swing Tail to the inserted node.
-                _tail.compare_exchange_strong(tail_combine, node_combine);
+                _tail.compare_exchange_strong(tail_combine, combine(node));
                 break;
             }
         }
@@ -73,13 +74,16 @@ public:
             // is there any problem with compare_exchange_strong ?
             uint64_t head_next_combine = head->next.load(std::memory_order_acquire);
             T* head_next = pointer<T>(head_next_combine);
+            if (unlikely(head_combine != _head.load(std::memory_order_acquire))) {
+              continue;
+            }
             if (head == tail) {
                 if (!head_next) {
                     // Queue empty.
                     return nullptr;
                 }
                 // Tail is falling behind, try to advance it.
-                _tail.compare_exchange_strong(tail_combine, combine(head_next, mask()));
+                _tail.compare_exchange_strong(tail_combine, combine(head_next));
             } else {
                 if (!head_next) {
                     // <boost/lockfree/queue.hpp>
@@ -87,9 +91,9 @@ public:
                 }
                 // Try to swing Head to the next node.
                 uint8_t bytes[DATA_SIZE];
-                memcpy(bytes, (uint8_t*)head_next + sizeof(IListNode<T>), DATA_SIZE);
-                if (_head.compare_exchange_weak(head_combine, combine(head_next, mask()))) {
-                    memcpy((uint8_t*)head + sizeof(IListNode<T>), bytes, DATA_SIZE);
+                memcpy(bytes, reinterpret_cast<uint8_t*>(head_next) + sizeof(IListNode<T>), DATA_SIZE);
+                if (_head.compare_exchange_weak(head_combine, combine(head_next))) {
+                    memcpy(reinterpret_cast<uint8_t*>(head) + sizeof(IListNode<T>), bytes, DATA_SIZE);
                     head->next.store(0, std::memory_order_release);
                     return head;
                 }

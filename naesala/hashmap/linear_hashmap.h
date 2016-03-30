@@ -107,10 +107,11 @@ class LinearHashmap {
   LinearHashmap(LinearHashmap&& other) noexcept :
       empty_key_(other.empty_key_), erased_key_(other.erased_key_),
       bucket_count_(other.bucket_count_), resize_count_(other.resize_count_),
-      mask_(other.mask_), size_(other.size_), used_(other.used_),
-      buckets_(other.buckets_) {
+      shrink_count_(other.shrink_count_), mask_(other.mask_), size_(other.size_),
+      used_(other.used_), buckets_(other.buckets_) {
     other.buckets_ = nullptr;
-    other.bucket_count_ = other.resize_count_ = other.mask_ = other.size_ = other.used_ = 0;
+    other.bucket_count_ = other.resize_count_ = other.shrink_count_ =
+        other.mask_ = other.size_ = other.used_ = 0;
   }
   LinearHashmap& operator=(LinearHashmap&& other) noexcept {
     assert(empty_key_ == other.empty_key_ && erased_key_ == other.erased_key_);
@@ -154,10 +155,6 @@ class LinearHashmap {
     return const_iterator(this, Get(key));
   }
 
-  template <class K, class V>
-  iterator insert(K&& key, V&& value) {
-    return emplace(std::forward<K>(key), std::forward<V>(value));
-  }
   template <class KV>
   iterator insert(KV&& kv) {
     return emplace(std::forward<KV>(kv));
@@ -179,10 +176,6 @@ class LinearHashmap {
         std::forward<typename PairTraits<KV>::second_type>(kv.second), false));
   }
 
-  template <class K, class V>
-  iterator insert_or_assign(K&& key, V&& value) {
-    return iterator(this, Set(std::forward<K>(key), std::forward<V>(value), true));
-  }
   template <class KV>
   iterator insert_or_assign(KV&& kv) {
     return iterator(this, Set(std::forward<typename PairTraits<KV>::first_type>(kv.first),
@@ -199,7 +192,10 @@ class LinearHashmap {
     Delete(Get(key));
   }
   void erase(const_iterator& pos) {
-    Delete(pos._cur);
+    Delete(pos.current_);
+  }
+  void erase(iterator& pos) {
+    Delete(pos.current_);
   }
 
   mapped_type& operator[](const Key& key) {
@@ -251,6 +247,7 @@ class LinearHashmap {
     assert(empty_key_ == other.empty_key_ && erased_key_ == other.erased_key_);
     std::swap(bucket_count_, other.bucket_count_);
     std::swap(resize_count_, other.resize_count_);
+    std::swap(shrink_count_, other.shrink_count_);
     std::swap(mask_, other.mask_);
     std::swap(size_, other.size_);
     std::swap(used_, other.used_);
@@ -276,6 +273,7 @@ class LinearHashmap {
   };
 
   static constexpr float kLoadFactor = 0.85;
+  static constexpr float kShrinkFactor = 0.2;
   static const Value& DummyValue() { static Value dummy_; return dummy_; }
 
   static constexpr int FindLastSet(unsigned x) {
@@ -286,12 +284,12 @@ class LinearHashmap {
     return x ? (1ul << FindLastSet(x - 1)) : 1;
   }
 
-  static size_t ResizeCount(size_t bucket_count) {
+  static size_t ResizeCount(size_t bucket_count, float factor) {
 //    return (std::floor(bucket_count * kLoadFactor) + 7) & ~7;
     if (!bucket_count) {
       return 0;
     }
-    size_t resize_count = std::floor(bucket_count * kLoadFactor);
+    size_t resize_count = std::floor(bucket_count * factor);
     return resize_count < bucket_count ? resize_count : bucket_count - 1;
   }
 
@@ -346,7 +344,7 @@ class LinearHashmap {
     }
     allocator_type().deallocate(buckets_, bucket_count_);
     buckets_ = nullptr;
-    bucket_count_ = resize_count_ = mask_ = size_ = used_ = 0;
+    bucket_count_ = resize_count_ = shrink_count_ = mask_ = size_ = used_ = 0;
   }
 
   void UninitializedCopy(const LinearHashmap& from) {
@@ -354,6 +352,7 @@ class LinearHashmap {
     buckets_ = allocator_type().allocate(from.bucket_count_);
     bucket_count_ = from.bucket_count_;
     resize_count_ = from.resize_count_;
+    shrink_count_ = from.shrink_count_;
     mask_ = bucket_count_ - 1;
     for (size_t index : sequence(bucket_count_)) {
       key_allocator_type().construct(&buckets_[index].first, from.buckets_[index].first);
@@ -389,6 +388,7 @@ class LinearHashmap {
   const Key erased_key_;
   size_t bucket_count_ { 0 }; // must be the power of 2, and minimal 8
   size_t resize_count_ { 0 };
+  size_t shrink_count_ { 0 };
   size_t mask_ { 0 };         // bucket_count_ - 1
   size_t size_ { 0 };         // exists
   size_t used_ { 0 };         // exists and deleted

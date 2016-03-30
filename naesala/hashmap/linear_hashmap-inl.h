@@ -82,7 +82,7 @@ template <class K, class V>
 size_t LinearHashmap<Key, Value, Hash, Pred, Alloc>::Set(K&& key, V&& value, bool displace) {
   if (used_ >= resize_count_) {
     // expand factor must be the index of 2
-    Resize(bucket_count_ ? bucket_count_ * 2 : 8);
+    Resize(bucket_count_ ? bucket_count_ << 1 : 8);
   }
   size_t index = hasher()(key) & mask_;
   // ensure not full by ResizeCount
@@ -113,6 +113,9 @@ void LinearHashmap<Key, Value, Hash, Pred, Alloc>::Delete(size_t index) {
   }
   SetDeleted(index);
   --size_;
+  if (unlikely(size_ < shrink_count_) && bucket_count_ > 8) {
+    Resize(bucket_count_ >> 1);
+  }
 }
 
 template<class Key, class Value, class Hash, class Pred, class Alloc>
@@ -124,7 +127,8 @@ bool LinearHashmap<Key, Value, Hash, Pred, Alloc>::Resize(size_t new_bucket_coun
     bucket_count_ = new_bucket_count;
     // new_bucket_count is already pow of 2
     // make sure new_bucket_count is larger than current bucket_count
-    resize_count_ = ResizeCount(new_bucket_count);
+    resize_count_ = ResizeCount(new_bucket_count, kLoadFactor);
+    shrink_count_ = ResizeCount(new_bucket_count, kShrinkFactor);
     mask_ = bucket_count_ - 1;
     for (size_t index = 0; index < bucket_count_; ++index) {
       SetEmpty(index);

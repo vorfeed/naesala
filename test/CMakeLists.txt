@@ -15,3 +15,5 @@ target_link_libraries(
 
 add_executable(proc_stat main_proc_stat.cpp)
 target_link_libraries(proc_stat test)
+add_executable(sizeof main_sizeof.cpp)
+target_link_libraries(sizeof test)

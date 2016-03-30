@@ -23,6 +23,12 @@ Configure
 
 * ConfParser：解析ini格式的配置文件
 
+Container
+
+* LRU：最近最少使用缓存
+
+* Trie：前缀树
+
 Hashmap
 
 * LinearHashmap：高性能线性hash表
@@ -58,6 +64,10 @@ Hashmap
 Lockfree
 
 * LockfreeStack、LockfreeList功能验证
+
+* 与boost::lockfree::queue的使用对比
+
+* 与加锁队列的性能对比
 
 
 ## Dependings

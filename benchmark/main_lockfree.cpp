@@ -14,8 +14,10 @@
 
 #include <naesala/common/range.h>
 #include <naesala/common/barrier.h>
+#include <naesala/common/duration.h>
 #include <naesala/lockfree/lockfree_stack.h>
 #include <naesala/lockfree/lockfree_list.h>
+#include <naesala/blocking_queue/cplus_condition_bounded_blocking_queue.h>
 
 using namespace naesala;
 
@@ -58,9 +60,23 @@ private:
     Container bq { 1024 };
 };
 
+class BBQWrapper {
+public:
+    struct Node { int data; int valid = 0xcdcdcdcd; };
+    typedef CplusConditionBoundedBlockingQueue<Node*> Container;
+    Container& operator()() {
+        return bbq;
+    }
+    void set(Node* node) { bbq.put(node); }
+    Node* get() { return bbq.take(); }
+private:
+    Container bbq { 1024 };
+};
+
 template <class Wrapper>
 void test_lockfree() {
     Wrapper wrapper;
+    Duration duration(typeid(Wrapper).name());
     int const PRODUCER_NUM = 32;
     int const CONSUMER_NUM = 32;
     int const DATA_COUNT = 1000;
@@ -130,8 +146,13 @@ void test_lockfree() {
 
 int main(int argc, char* argv[]) {
     test_lockfree<LFSWrapper>();
+    std::cout << std::endl;
     test_lockfree<LFLWrapper>();
+    std::cout << std::endl;
     test_lockfree<BoostQueueWrapper>();
+    std::cout << std::endl;
+    test_lockfree<BBQWrapper>();
+    std::cout << std::endl;
     return 0;
 }
 

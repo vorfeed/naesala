@@ -30,8 +30,8 @@ public:
         T _value, _step;
     };
 
-    Range(T end) : _start(T()), _end(end), _step(T() + 1 - T()) {}
-    Range(T start, T end, T step = T() + 1 - T()) :
+    Range(T end) : _start(T()), _end(end), _step(1) {}
+    Range(T start, T end, T step = 1) :
             _start(start), _end(end), _step(step) {}
 
     iterator begin() const {
@@ -46,6 +46,7 @@ private:
 };
 
 typedef Range<int> range;
+typedef Range<size_t> sequence;
 
 } // namespace naesala
 

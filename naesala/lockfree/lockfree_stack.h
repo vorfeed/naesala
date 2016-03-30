@@ -24,7 +24,7 @@ public:
     // T is a heap object.
     void push(T* node) {
         uint64_t last_top_combine = 0;
-        uint64_t node_combine = combine(node, mask());
+        uint64_t node_combine = combine(node);
         do {
             last_top_combine = _top.load(std::memory_order_acquire);
             node->next = pointer<T>(last_top_combine);
@@ -40,7 +40,7 @@ public:
             if (!top) {
                 return nullptr;
             }
-            new_top_combine = combine(top->next, mask());
+            new_top_combine = combine(top->next);
         } while(!_top.compare_exchange_weak(top_combine, new_top_combine));
         return top;
     }

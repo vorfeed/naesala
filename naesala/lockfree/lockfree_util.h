@@ -6,14 +6,7 @@
 
 #pragma once
 
-#include <limits.h>
-
 namespace naesala {
-
-/// Use the high 16bits as mask to solve ABA problem.
-inline uint64_t mask() {
-    return static_cast<uint64_t>(rand() % INT16_MAX) << 48;
-}
 
 /// Get real pointer from combination.
 template <class T>
@@ -21,10 +14,13 @@ T* pointer(uint64_t combine) {
     return reinterpret_cast<T*>(combine & 0x0000FFFFFFFFFFFF);
 }
 
+/// Use the high 16bits as mask to solve ABA problem.
 /// Combine pointer and mask.
 template <class T>
-uint64_t combine(T* pointer, uint64_t mask) {
-    return reinterpret_cast<uint64_t>(pointer) | mask;
+uint64_t combine(T* pointer) {
+    static std::atomic_short version(0);
+    return reinterpret_cast<uint64_t>(pointer) |
+        (static_cast<uint64_t>(version.fetch_add(1, std::memory_order_acq_rel)) << 48);
 }
 
 } // namespace naesala
